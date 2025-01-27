@@ -1,0 +1,31 @@
+name: Deploy Terraform to GCP
+ 
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - qa
+ 
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+      - name: Terraform init
+        run: terraform init
+      - name: Terraform apply for dev environment
+        if: github.ref == 'refs/heads/dev'
+        run: terraform apply -var-file=dev/terraform.tfvars -auto-approve
+      - name: Terraform apply for qa environment
+        if: github.ref == 'refs/heads/qa'
+        run: terraform apply -var-file=qa/terraform.tfvars -auto-approve
+      - name: Terraform apply for prod environment
+        if: github.ref == 'refs/heads/prod'
+        run: terraform apply -var-file=prod/terraform.tfvars -auto-approve
