@@ -1,31 +1,69 @@
-name: Deploy Terraform to GCP
- 
+name: Deploy GCP Monitoring Dashboard
+
+# Define the workflow trigger (on push to dev, qa, or prod branches)
 on:
   push:
     branches:
-      - main
-      - dev
-      - qa
- 
+      - develop  # Trigger for dev environment
+      - qa       # Trigger for QA environment
+      - master   # Trigger for prod environment
+
 jobs:
-  terraform:
+  # Dev Deployment Job
+  dev_deploy:
     runs-on: ubuntu-latest
- 
+    if: github.ref == 'refs/heads/develop'  # Only run on develop branch
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Google Cloud Credentials
-        uses: google-github-actions/setup-gcloud@v0
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0.7.0
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
-      - name: Terraform init
-        run: terraform init
-      - name: Terraform apply for dev environment
-        if: github.ref == 'refs/heads/dev'
-        run: terraform apply -var-file=dev/terraform.tfvars -auto-approve
-      - name: Terraform apply for qa environment
-        if: github.ref == 'refs/heads/qa'
-        run: terraform apply -var-file=qa/terraform.tfvars -auto-approve
-      - name: Terraform apply for prod environment
-        if: github.ref == 'refs/heads/prod'
-        run: terraform apply -var-file=prod/terraform.tfvars -auto-approve
+          project_id: ${{ secrets.GCP_DEV_PROJECT_ID }}
+          credentials_json: ${{ secrets.GCP_DEV_CREDENTIALS }}
+
+      - name: Deploy Dashboard to Dev
+        run: |
+          gcloud config set project ${{ secrets.GCP_DEV_PROJECT_ID }}
+          gcloud monitoring dashboards create --config-from-file=dev-dashboard.json  # Use your actual JSON file here
+
+  # QA Deployment Job
+  qa_deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/qa'  # Only run on qa branch
+    needs: dev_deploy  # Wait for the dev deployment to finish
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0.7.0
+        with:
+          project_id: ${{ secrets.GCP_QA_PROJECT_ID }}
+          credentials_json: ${{ secrets.GCP_QA_CREDENTIALS }}
+
+      - name: Deploy Dashboard to QA
+        run: |
+          gcloud config set project ${{ secrets.GCP_QA_PROJECT_ID }}
+          gcloud monitoring dashboards create --config-from-file=qa-dashboard.json  # Use your actual JSON file here
+
+  # Prod Deployment Job
+  prod_deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'  # Only run on master branch
+    needs: qa_deploy  # Wait for the QA deployment to finish
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0.7.0
+        with:
+          project_id: ${{ secrets.GCP_PROD_PROJECT_ID }}
+          credentials_json: ${{ secrets.GCP_PROD_CREDENTIALS }}
+
+      - name: Deploy Dashboard to Prod
+        run: |
+          gcloud config set project ${{ secrets.GCP_PROD_PROJECT_ID }}
+          gcloud monitoring dashboards create --config-from-file=prod-dashboard.json  # Use your actual JSON file here
